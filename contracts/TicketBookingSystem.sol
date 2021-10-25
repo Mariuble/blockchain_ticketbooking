@@ -2,50 +2,54 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
-Struct Seat {
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+
+struct Seat {
     string title;
     string date;
-    uint price;
-    uint number;
-    uint row;
+    uint256 price;
+    uint256 number;
+    uint256 row;
     string seat_view;
 }
 
+// A smart contract for each show
 contract TicketBookingSystem {
+    // Variables
     string show_title;
-    Seat[] seats;
-    // Other information
-    
-    function buy() public {
-        
+    Seat[] available_seats;
+    address public owner;
+    string information;
+
+    constructor(
+        string memory _show_title,
+        Seat[] memory _available_seats,
+        string memory _information
+    ) {
+        show_title = _show_title;
+        available_seats = _available_seats;
+        information = _information;
+        owner = msg.sender;
+    }
+
+    function buy(address payable buyer, Seat memory seat) public {
+        // Generate and transfer unique ticket
+        uint256 balance = buyer.balance;
+        if (balance < seat.price) {
+            // throw;
+        }
     }
 }
 
-/**
- * @title Storage
- * @dev Store & retrieve value in a variable
- */
-contract Ticket {
+abstract contract Ticket is ERC721 {
+    address public minter = msg.sender;
+    Seat seat;
 
-    uint256 number;
-
-    /**
-     * @dev Store value in variable
-     * @param num value to store
-     */
-    function store(uint256 num) public {
-        number = num;
-    }
-
-    /**
-     * @dev Return value 
-     * @return value of 'number'
-     */
-    function retrieve() public view returns (uint256){
-        return number;
+    function mint(address to) public {
+        //
     }
 }
 
-contract Poster {
-    
+abstract contract Poster is ERC721 {
+    //
 }
