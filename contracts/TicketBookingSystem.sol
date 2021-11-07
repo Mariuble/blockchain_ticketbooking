@@ -17,6 +17,7 @@ struct Seat {
 contract TicketBookingSystem {
     // Variables
     string show_title;
+    uint256 public seatPrice;
     Seat[] available_seats;
     address public owner;
     string information;
@@ -33,44 +34,34 @@ contract TicketBookingSystem {
         owner = msg.sender;
     }
 
+    function setSeatPrice(uint _seatPrice) public {
+    require(msg.sender == owner, "Only the owner may perform this action");
+    seatPrice = _seatPrice;
+    }
+
     function buy(address payable buyer, Seat memory seat) public {
         // Generate and transfer unique ticket
         uint256 balance = buyer.balance;
         require(balance < seat.price, "Balance is too low!");
-        t.mint(buyer);
+        t.mintST(buyer);
     }
 }
 
 abstract contract Ticket is ERC721 {
-    address public minter = msg.sender;
-    Seat seat;
-    mapping (address => uint256) public balances;
-    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
-    tokenId=0;
-        // Mapping from holder address to their (enumerable) set of owned tokens
-    mapping (address => EnumerableSet.UintSet) private _holderTokens;
-    // Enumerable mapping from token ids to their owners
-    EnumerableMap.UintToAddressMap private _tokenOwners;
+    address public Minter_address;
+    uint256 private tokenId;
+    mapping(uint256 => address) private _owners;
+    mapping(address => uint256) private _balances;
     
-    
-    //Generate new token
-    /*
-    function mint(address to) internal virtual {
-        require(to != address(0), "ERC721: mint to the zero address");
-        require(!_exists(tokenId), "ERC721: token already minted");
-        require(_checkOnERC721Received(address(0), to, tokenId, _data)
-        _holderTokens[to].add(tokenId);
-        _tokenOwners.set(tokenId, to);
-        emit Transfer(address(0), to, tokenId);
+    constructor() ERC721("ShowTicket", "ST"){
+        tokenId = 0;
     }
-    */
-    function mint(address recipient) internal virtual
-    returns (uint256)
-    {
-    unit256 newItemId= tokenId;
-    _mint(recipient, newItemId);
-    tokenId +=1;
-    return newItemId;
+    
+    function mintST(address recipient) public returns(uint256){
+        uint256 newItemId = tokenId;
+        _mint(recipient, newItemId);
+        tokenId +=1;
+        return newItemId;
     }
 }
 
