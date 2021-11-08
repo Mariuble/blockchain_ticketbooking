@@ -95,11 +95,7 @@ contract TicketBookingSystem {
     }
 }
 
-<<<<<<< HEAD
-abstract contract Ticket is ERC721 { //TODO bruker ser hva ticket er
-=======
 contract Ticket is ERC721 {
->>>>>>> 2441b81f43a1050f8b8af5b6f5172f91379503a7
     address public Minter_address;
     uint256 private tokenId;
     // mapping(uint256 => address) private owners;
