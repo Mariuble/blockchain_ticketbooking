@@ -27,7 +27,7 @@ contract TicketBookingSystem {
 
     mapping(uint256 => address) owners;
 
-<<<<<<< HEAD
+
     constructor(
         string memory _show_title, 
         string memory _date,
