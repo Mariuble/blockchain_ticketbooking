@@ -27,6 +27,7 @@ contract TicketBookingSystem {
 
     mapping(uint256 => address) owners;
 
+<<<<<<< HEAD
     constructor(
         string memory _show_title, 
         string memory _date,
@@ -37,6 +38,12 @@ contract TicketBookingSystem {
     ) {
         show_title = _show_title;
         seatPrice = _price;
+=======
+    constructor(string memory _show_title, uint256 _seat_row, uint256 _seats_per_row string memory _information) {
+        show_title = _show_title; 
+        available_seats = _available_seats;
+        information = _information;
+>>>>>>> 2441b81f43a1050f8b8af5b6f5172f91379503a7
         owner = msg.sender;
         information = _information;
 
@@ -88,7 +95,11 @@ contract TicketBookingSystem {
     }
 }
 
+<<<<<<< HEAD
 abstract contract Ticket is ERC721 { //TODO bruker ser hva ticket er
+=======
+contract Ticket is ERC721 {
+>>>>>>> 2441b81f43a1050f8b8af5b6f5172f91379503a7
     address public Minter_address;
     uint256 private tokenId;
     // mapping(uint256 => address) private owners;
@@ -112,3 +123,4 @@ abstract contract Poster is ERC721 {
     // An overview of which shows the addresses have participated in
     // mapping(address => String[]) public participated_shows;
 }
+
