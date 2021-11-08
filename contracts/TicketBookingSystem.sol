@@ -18,17 +18,12 @@ contract TicketBookingSystem {
     // Variables
     string show_title;
     uint256 public seatPrice;
-    Seat[] available_seats;
     address public owner;
     string information;
     Ticket t = new Ticket();
 
-    constructor(
-        string memory _show_title,
-        Seat[] memory _available_seats,
-        string memory _information
-    ) {
-        show_title = _show_title;
+    constructor(string memory _show_title, uint256 _seat_row, uint256 _seats_per_row string memory _information) {
+        show_title = _show_title; 
         available_seats = _available_seats;
         information = _information;
         owner = msg.sender;
@@ -47,7 +42,7 @@ contract TicketBookingSystem {
     }
 }
 
-abstract contract Ticket is ERC721 {
+contract Ticket is ERC721 {
     address public Minter_address;
     uint256 private tokenId;
     mapping(uint256 => address) private _owners;
@@ -68,3 +63,4 @@ abstract contract Ticket is ERC721 {
 abstract contract Poster is ERC721 {
     //
 }
+
