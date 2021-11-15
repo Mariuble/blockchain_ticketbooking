@@ -5,6 +5,37 @@ pragma solidity >=0.7.0 <0.9.0;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 
+contract MasterContract{
+    Poster public poster;
+    address public owner;
+    address public ticketowner;
+
+    constructor(){
+        poster = new Poster();
+        owner = msg.sender;
+    }
+    
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner may perform this action");
+        _;
+    }
+
+    function createShow(
+        string memory show_title, 
+        uint256 _date,
+        uint256 _price,
+        uint256 _seat_row, 
+        uint256 _seats_per_row,
+        string  memory _information) public returns(address){      
+        TicketBookingSystem t = new TicketBookingSystem(show_title,_date, _price,_seat_row, _seats_per_row, _information, poster, msg.sender);
+        ticketowner= address(t);
+        return address(t);
+    }
+
+
+    
+}
+
 // A smart contract unique for each show
 contract TicketBookingSystem {
     // Variables
@@ -29,6 +60,7 @@ contract TicketBookingSystem {
     }
 
     mapping(uint256 => address payable) owners; //token id til adresse dictionary
+    mapping(address => uint256) balanceOf; 
 
     constructor(
         string memory _show_title, 
@@ -36,14 +68,17 @@ contract TicketBookingSystem {
         uint256 _price,
         uint256 _seat_row, 
         uint256 _seats_per_row,
-        string memory _information
+        string memory _information,
+        Poster _poster, 
+        address deployer
     ) {
         show_title = _show_title;
         seatPrice = _price;
-        owner = msg.sender;
+        owner = deployer;
         information = _information;
         date = _date;
         ticket = new Ticket();
+        poster = _poster;
 
         for (uint i=0; i< _seat_row; i++){
             for (uint j=0; j< _seats_per_row; j++){
@@ -81,23 +116,33 @@ contract TicketBookingSystem {
     //     return owners[msg.sender]; // null default
     // }
     
+
+    
     // buy a specific seat. Function call costs
     //TODO edit seat object in the input to be row and number and add checks.
-    function buy(address payable buyer, Seat memory seat) payable public { 
-        // Generate and transfer unique ticket
-        require(!seat.occupied, "Seat already taken");
-        uint256 balance = buyer.balance;
-        require(balance < seat.price, "Balance is too low!");
-        
-        // Mint Ticket
-        uint256 tokenId = ticket.mintST(buyer);
-        
-        //Set seat to be occupied
-        require(ticket.exists(tokenId), "Token has not been minted");
-        owners[tokenId] = buyer;
-        seat.occupied = true;
-        seat.tokenId = tokenId;
-        emit Buy(buyer, seat.price);
+    function buy(address payable buyer, uint256 _seatrow, uint256 _seatnumber) payable public returns(uint256){
+        uint256 tokenIdreturn;
+        for (uint i=0; i< available_seats.length; i++){
+            if ((available_seats[uint(i)].row ==_seatrow) && (available_seats[uint(i)].number ==_seatnumber)) {
+                require(!available_seats[uint(i)].occupied, "Seat already taken");
+                uint256 balance = buyer.balance;
+                require(balance >= available_seats[uint(i)].price, "Balance is too low!");
+                // Mint Ticket
+                uint256 tokenId = ticket.mintST(buyer);
+
+                //Set seat to be occupied
+                require(ticket.exists(tokenId), "Token has not been minted");
+                owners[tokenId] = buyer;
+                available_seats[uint(i)].occupied = true;
+                available_seats[uint(i)].tokenId = tokenId;
+                tokenIdreturn = tokenId;
+                payable(owner).transfer(available_seats[uint(i)].price);
+                emit Buy(buyer, available_seats[uint(i)].price);
+                
+                break;
+            }
+        }
+        return tokenIdreturn;
         
     }
 
@@ -136,9 +181,8 @@ contract TicketBookingSystem {
     }
 
     function releasePoster(address reciever) private {
-        poster.mintST(reciever);
+        poster.mintPoster(reciever, show_title);
     }
-
 
 }
 contract Ticket is ERC721 {
@@ -156,7 +200,7 @@ contract Ticket is ERC721 {
 
     function mintST(address recipient) public returns(uint256){
         uint256 newItemId = tokenId;
-        _mint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
+        _safeMint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
         tokenId +=1;
         // Buy function, calls minting of ticket, set ticketOwner variable, emit event to notify
         return newItemId;
@@ -171,19 +215,35 @@ contract Ticket is ERC721 {
     }
 }
 
-abstract contract Poster is ERC721 {
+contract Poster is ERC721 {
     // An overview of which shows the addresses have participated in
     // mapping(address => String[]) public participated_shows;
     //mapping(address => String[]) public hallOfFame;
     uint256 posterId;
+    //mapping posterId - show
+    mapping(uint256 => string) MapPosterIdShow;
+    
+    string[] public shows; 
 
     constructor() ERC721("Poster", "POS"){
          posterId = 1;
      }
-     function mintST(address recipient) public {
+    function mintPoster(address recipient, string memory show_title) public returns(uint256) {
         uint256 newItemId = posterId;
-        _mint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
+        _safeMint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
+        MapPosterIdShow[newItemId] = show_title; //vurdere å teste om posterID finnes.
         posterId += 1;
+        return newItemId;
+        }
+
+    function getPosters(address recipient) public returns (string[] memory){
+        delete shows;
+        for (uint i=1; i<= posterId; i++){
+            if (recipient == ownerOf(i)){
+                shows.push(MapPosterIdShow[i]);
+            }
+        }
+        return shows;
     }
 
 }
