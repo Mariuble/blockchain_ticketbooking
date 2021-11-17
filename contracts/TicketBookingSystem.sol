@@ -5,6 +5,123 @@ pragma solidity >=0.7.0 <0.9.0;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 
+contract MasterContract{
+    Poster public poster;
+    address public owner;
+    address public ticketowner;
+    uint256 private nextSaleId;
+    uint256 public saleID;
+    TicketBookingSystem[] public available_shows;
+    SalesObject[] public forSale;
+
+    //mapping(uint256 => SalesObject) public forSale;
+   // uint256 private nextShowID;
+    //mapping(uint256 => TicketBookingSystem) public ticketBookingSystems;
+
+
+    constructor(){
+        poster = new Poster();
+        owner = msg.sender;
+        //Each salesobject has their unique id.
+        //nextSaleId = 0;
+        //Each show has unique id.
+        //nextShowId = 0;
+    }
+
+    struct SalesObject {
+        uint256 price;
+        TicketBookingSystem ticketBookingSystem;
+        uint256 tokenId;
+        //address 
+    }
+    
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner may perform this action");
+        _;
+    }
+
+    function createShow(
+        string memory show_title, 
+        uint256 _date,
+        uint256 _price,
+        uint256 _seat_row, 
+        uint256 _seats_per_row,
+        string  memory _information) public returns(address){      
+        TicketBookingSystem t = new TicketBookingSystem(show_title,_date, _price,_seat_row, _seats_per_row, _information, poster, msg.sender);
+        available_shows.push(t);
+        ticketowner= address(t);
+
+        return address(t);
+    }
+
+/*
+    function getAvailableShows public pure returns (bytes32[]) {
+        return available_shows;
+    }
+
+    function getShowName(uint256 showIndex) public returns(string){
+        require(available_shows.length >= showIndex, "The index you specified does not exist");
+        String showname = available_shows[showIndex].title;
+        return showname;
+    }
+    
+    function getAllSalesobject public pure returns (bytes32[]) {
+        return forSale;
+    }
+    
+    function getSalesObject(uint256 indexforSale) public returns(SalesObject){
+        require(forSale.length >= indexforSale, "Index you specified does not exist");
+        SalesObject o = forSale[showIndex];
+        return o;
+    }
+*/
+    
+    /*
+    function tradeTicket(address from, address to, uint256 ticketIdFrom, uint256 _ticketIdTo) {
+        require(t.owners[ticketIdFrom] == msg.sender, "Only the owner of the ticket can trade this ticket");
+        require(t.owners[_ticketIdTo] == to, "Only the owner of the ticket can trade this ticket");
+        require(forSale[ticketId]); // Alltid true
+
+    }*/
+    
+    //Put ticket to sale, by specifying showId, price you want to sell to, tokenId
+    function sellTicket(uint256 showIndex, uint256 price, uint256 tokenId) public{
+        //Check if show exists
+        require(available_shows.length >= showIndex, "The index you specified does not exist");
+        //Check if tokenId is valid        
+        require(available_shows[showIndex].verify(tokenId, msg.sender), "The tokenId does not belong to you.");
+        SalesObject memory o = SalesObject(price, available_shows[showIndex], tokenId);
+        forSale.push(o);
+        //nextSaleId += 1;
+        //Ticket t = available_shows[showIndex].getTicket();
+        // t.safeTransferFrom(ticketHolder, owner, tokenId); // Transfer ownership to contract
+        //t.setApprovalForAll(owner, true);
+    }
+
+    //We assume that the
+    function buyTicketFromUser(uint256 indexforSale) public payable {
+        address buyer = msg.sender;
+        uint256 balance = buyer.balance;
+        //The following requirements are used to check that you get the ticket you specify. 
+        //require(price == forSale[indexforSale].price, "The price you have specified does not match the price for the ticket.");
+        //require(keccak256(abi.encodePacket(showName)) == keccak256(abi.encodePacket(forSale[indexforSale].ticketBookingSystem.show_title)), "The title of the show does not match your wanted title.");
+        //require(date = forSale[indexforSale].ticketBookingSystem.date, "The date of the show does not match your wanted date.");
+        //Require that the index exists in the list.
+        require(indexforSale < forSale.length, "This element is not for sale");
+        //Require that the buyer has enough money to buy the ticket element. 
+        require(balance >= forSale[indexforSale].price, "Balance is too low!");
+        //Transfer money from owner to buyer
+        address payable ticketHolder = payable(forSale[indexforSale].ticketBookingSystem.getTicket().ownerOf(forSale[indexforSale].tokenId));
+        ticketHolder.transfer(forSale[indexforSale].price);
+        //Change TokenID owner
+        forSale[indexforSale].ticketBookingSystem.getTicket().safeTransferFrom(owner, buyer, forSale[indexforSale].tokenId);
+        //Remove ticket from forSale list. 
+        forSale[indexforSale] = forSale[forSale.length - 1];
+        delete forSale[forSale.length - 1];
+        forSale.pop();
+    }
+}
+
 // A smart contract unique for each show
 contract TicketBookingSystem {
     // Variables
@@ -29,6 +146,7 @@ contract TicketBookingSystem {
     }
 
     mapping(uint256 => address payable) owners; //token id til adresse dictionary
+    mapping(address => uint256) balanceOf; 
 
     constructor(
         string memory _show_title, 
@@ -36,14 +154,19 @@ contract TicketBookingSystem {
         uint256 _price,
         uint256 _seat_row, 
         uint256 _seats_per_row,
-        string memory _information
+        string memory _information,
+        Poster _poster, 
+        address deployer
     ) {
         show_title = _show_title;
         seatPrice = _price;
-        owner = msg.sender;
+        owner = deployer;
         information = _information;
         date = _date;
         ticket = new Ticket();
+//        ticket.setApprovalForAll(owner, true);
+
+        poster = _poster;
 
         for (uint i=0; i< _seat_row; i++){
             for (uint j=0; j< _seats_per_row; j++){
@@ -81,23 +204,33 @@ contract TicketBookingSystem {
     //     return owners[msg.sender]; // null default
     // }
     
+
+    
     // buy a specific seat. Function call costs
     //TODO edit seat object in the input to be row and number and add checks.
-    function buy(address payable buyer, Seat memory seat) payable public { 
-        // Generate and transfer unique ticket
-        require(!seat.occupied, "Seat already taken");
-        uint256 balance = buyer.balance;
-        require(balance < seat.price, "Balance is too low!");
-        
-        // Mint Ticket
-        uint256 tokenId = ticket.mintST(buyer);
-        
-        //Set seat to be occupied
-        require(ticket.exists(tokenId), "Token has not been minted");
-        owners[tokenId] = buyer;
-        seat.occupied = true;
-        seat.tokenId = tokenId;
-        emit Buy(buyer, seat.price);
+    function buy(uint256 _seatrow, uint256 _seatnumber) payable public returns(uint256){
+        address buyer = payable(msg.sender);
+        uint256 tokenIdreturn;
+        for (uint i=0; i< available_seats.length; i++){
+            if ((available_seats[uint(i)].row ==_seatrow) && (available_seats[uint(i)].number ==_seatnumber)) {
+                require(!available_seats[uint(i)].occupied, "Seat already taken");
+                uint256 balance = buyer.balance;
+                require(balance >= available_seats[uint(i)].price, "Balance is too low!");
+                // Mint Ticket
+                uint256 tokenId = ticket.mintST(buyer);
+                //Set seat to be occupied
+                require(ticket.exists(tokenId), "Token has not been minted");
+                owners[tokenId] = payable(buyer);
+                available_seats[uint(i)].occupied = true;
+                available_seats[uint(i)].tokenId = tokenId;
+                tokenIdreturn = tokenId;
+                payable(owner).transfer(available_seats[uint(i)].price);
+                emit Buy(buyer, available_seats[uint(i)].price);
+                
+                break;
+            }
+        }
+        return tokenIdreturn;
         
     }
 
@@ -115,6 +248,7 @@ contract TicketBookingSystem {
             if (available_seats[uint(i)].occupied){
                 uint256 tokenId = available_seats[uint(i)].tokenId;
                 if(ticket.ownerOf(tokenId) == owners[tokenId]){ //correct owner address
+                    // Hvis error med payable, parse slik "payable(owners[tokenId]).tran..."
                     owners[tokenId].transfer(available_seats[uint(i)].price); //transfer seatprice from owner to ticketowner
                     ticket.burn(tokenId);
                 }
@@ -136,15 +270,19 @@ contract TicketBookingSystem {
     }
 
     function releasePoster(address reciever) private {
-        poster.mintST(reciever);
+        poster.mintPoster(reciever, show_title);
     }
+
+    function getTicket() public view returns (Ticket) {
+        return ticket;
+    }
+
 
 
 }
 contract Ticket is ERC721 {
     address public Minter_address;
     uint256 private tokenId;
-    
     // mapping(uint256 => address) private owners;
     // mapping(address => uint256) private balances;
     
@@ -156,7 +294,7 @@ contract Ticket is ERC721 {
 
     function mintST(address recipient) public returns(uint256){
         uint256 newItemId = tokenId;
-        _mint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
+        _safeMint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
         tokenId +=1;
         // Buy function, calls minting of ticket, set ticketOwner variable, emit event to notify
         return newItemId;
@@ -169,21 +307,42 @@ contract Ticket is ERC721 {
     function burn(uint256 _tokenId) public {
         _burn(_tokenId);
     }
+/*
+    function safeTransferFrom(address from, address to, uint256 tokenId) view public {
+        safeTransferFrom(from, to, tokenId);
+    }
+    */
 }
 
-abstract contract Poster is ERC721 {
+contract Poster is ERC721 {
     // An overview of which shows the addresses have participated in
     // mapping(address => String[]) public participated_shows;
     //mapping(address => String[]) public hallOfFame;
     uint256 posterId;
+    //mapping posterId - show
+    mapping(uint256 => string) MapPosterIdShow;
+    
+    string[] public shows; 
 
     constructor() ERC721("Poster", "POS"){
          posterId = 1;
      }
-     function mintST(address recipient) public {
+    function mintPoster(address recipient, string memory show_title) public returns(uint256) {
         uint256 newItemId = posterId;
-        _mint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
+        _safeMint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
+        MapPosterIdShow[newItemId] = show_title; //vurdere å teste om posterID finnes.
         posterId += 1;
+        return newItemId;
+        }
+
+    function getPosters(address recipient) public returns (string[] memory){
+        delete shows;
+        for (uint i=1; i<= posterId; i++){
+            if (recipient == ownerOf(i)){
+                shows.push(MapPosterIdShow[i]);
+            }
+        }
+        return shows;
     }
 
 }
