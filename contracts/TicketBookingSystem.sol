@@ -8,9 +8,9 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 contract MasterContract{
     Poster public poster;
     address public owner;
-    address public ticketowner;
-    uint256 private nextSaleId;
-    uint256 public saleID;
+    address public showAddress;
+   // uint256 private nextSaleId;
+    //uint256 public saleID;
     TicketBookingSystem[] public available_shows;
     SalesObject[] public forSale;
 
@@ -49,7 +49,7 @@ contract MasterContract{
         string  memory _information) public returns(address){      
         TicketBookingSystem t = new TicketBookingSystem(show_title,_date, _price,_seat_row, _seats_per_row, _information, poster, msg.sender);
         available_shows.push(t);
-        ticketowner= address(t);
+        showAddress= address(t);
 
         return address(t);
     }
@@ -120,6 +120,12 @@ contract MasterContract{
         delete forSale[forSale.length - 1];
         forSale.pop();
     }
+
+    function getPosters(address recipient) public returns (string[] memory){
+        return poster.getPosters(recipient);
+    }
+
+
 }
 
 // A smart contract unique for each show
@@ -133,6 +139,8 @@ contract TicketBookingSystem {
     Seat[] public available_seats;
     Ticket private ticket;
     Poster public poster;
+    uint256 private seatRow;
+    uint256 private seatPerRow;
 
     struct Seat {
         string title;
@@ -146,7 +154,7 @@ contract TicketBookingSystem {
     }
 
     mapping(uint256 => address payable) owners; //token id til adresse dictionary
-    mapping(address => uint256) balanceOf; 
+    mapping(address => uint256) balanceOf; // Blir ikke brukt
 
     constructor(
         string memory _show_title, 
@@ -160,6 +168,8 @@ contract TicketBookingSystem {
     ) {
         show_title = _show_title;
         seatPrice = _price;
+        seatRow = _seat_row;
+        seatPerRow = _seats_per_row;
         owner = deployer;
         information = _information;
         date = _date;
@@ -209,6 +219,7 @@ contract TicketBookingSystem {
     // buy a specific seat. Function call costs
     //TODO edit seat object in the input to be row and number and add checks.
     function buy(uint256 _seatrow, uint256 _seatnumber) payable public returns(uint256){
+        require(_seatrow<=seatRow && _seatnumber<=seatPerRow && _seatrow*_seatnumber>0, "Seat does not exist");
         address buyer = payable(msg.sender);
         uint256 tokenIdreturn;
         for (uint i=0; i< available_seats.length; i++){
@@ -234,16 +245,21 @@ contract TicketBookingSystem {
         
     }
 
+    function getOwner(uint256 ticketId) public view returns (address) {
+        return ticket.ownerOf(ticketId);
+    }
+
+
     function verify(uint256 tokenId, address tokenOwner) public view returns (bool) {
         // Check if token exists and therefore is minted, but not spent.
-        require(ticket.exists(tokenId), "Token has not been minted");
+        require(ticket.exists(tokenId), "Token has not been minted or is used");
         require(ticket.ownerOf(tokenId) == tokenOwner, "This is not the owner");
-        require(block.timestamp > date, "Your ticket has expired :(");
+        require(block.timestamp < date, "Your ticket has expired :(");
         return true;
     }
     
-
-    function refund() public onlyOwner { //assumes show has money because it is a kjent theater
+    // Refund tickets from show host
+    function refund() public payable onlyOwner { //assumes show has money because it is a kjent theater
         for (uint i=0; i< available_seats.length; i++){
             if (available_seats[uint(i)].occupied){
                 uint256 tokenId = available_seats[uint(i)].tokenId;
@@ -251,6 +267,8 @@ contract TicketBookingSystem {
                     // Hvis error med payable, parse slik "payable(owners[tokenId]).tran..."
                     owners[tokenId].transfer(available_seats[uint(i)].price); //transfer seatprice from owner to ticketowner
                     ticket.burn(tokenId);
+                    available_seats[uint(i)].occupied = false;
+                    available_seats[uint(i)].price = seatPrice;
                 }
             }
         }
@@ -260,11 +278,12 @@ contract TicketBookingSystem {
     function getBalance() public view returns (uint) {
         return owner.balance;
     }
+
     
     function validate(uint256 tokenId, address tokenOwner) public onlyOwner{
-        require(verify(tokenId, tokenOwner));
+        require(verify(tokenId, tokenOwner), "");
         uint256 OneDayBefore = date - 86400;
-        require(date < OneDayBefore, "Too early to validate");
+        require(block.timestamp > OneDayBefore, "Too early to validate");
         ticket.burn(tokenId);
         releasePoster(tokenOwner);
     }
@@ -337,7 +356,7 @@ contract Poster is ERC721 {
 
     function getPosters(address recipient) public returns (string[] memory){
         delete shows;
-        for (uint i=1; i<= posterId; i++){
+        for (uint i=1; i< posterId; i++){
             if (recipient == ownerOf(i)){
                 shows.push(MapPosterIdShow[i]);
             }
