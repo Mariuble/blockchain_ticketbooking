@@ -184,8 +184,8 @@ contract TicketBookingSystem {
             require(checkTicketForTrade(_swaptokenID, row, nr), "They dont want to trade with you"); // check seatAim and seatNumber
             
             // Transfer tickets
-            ticket.safeTransferFrom(msg.sender, ticketowner, _swaptokenID); // Guarantee transferred
-            this.   .safeTransferFrom(ticketowner, msg.sender, _tokenID);
+            getTicket().safeTransferFrom(msg.sender, ticketowner, _swaptokenID); // Guarantee transferred
+            this.getTicket().safeTransferFrom(ticketowner, msg.sender, _tokenID);
         }
         
         //Buy ticket
