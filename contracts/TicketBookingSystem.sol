@@ -263,12 +263,6 @@ contract TicketBookingSystem is ERC721{
         cancel = true;        
     }
 
-
-    function getBalance() public view returns (uint) {
-        return owner.balance;
-    }
-
-    
     function validate(uint256 tokenId, address tokenOwner) public onlyOwner{
         require(verify(tokenId, tokenOwner), "Something went wrong.");
         uint256 OneDayBefore = date - 86400;
@@ -280,11 +274,6 @@ contract TicketBookingSystem is ERC721{
     function releasePoster(address reciever) private {
         poster.mintPoster(reciever, show_title);
     }
-    
-
-
-
-
 }
 
 contract Poster is ERC721 {
