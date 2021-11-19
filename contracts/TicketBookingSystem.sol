@@ -280,7 +280,7 @@ contract TicketBookingSystem is ERC721{
 
 //Proof of attendance
 contract Poster is ERC721 {
-    uint256 posterId;
+    uint256 private posterId;
     //mapping posterId - show
     mapping(uint256 => string) MapPosterIdShow;
     
