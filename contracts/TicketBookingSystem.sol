@@ -5,7 +5,7 @@ pragma solidity >=0.7.0 <0.9.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-
+//Creates shows and keeps the poster for all shows
 contract MasterContract{
     Poster public poster;
     address public owner;
@@ -45,14 +45,13 @@ contract TicketBookingSystem is ERC721{
     uint256 public seatPrice;
     address public owner;
     string public information;
-    Seat[] public taken_seats;
-    SalesObject[] public for_sale;
-   // Ticket private ticket;
-    Poster public poster;
+    Poster private poster;
     uint256 private seatRow;
     uint256 private seatPerRow;
     bool private cancel;
     uint256 private ticketId;
+    Seat[] public taken_seats;
+    SalesObject[] public for_sale;
 
     struct Seat {
         string title;
@@ -65,7 +64,8 @@ contract TicketBookingSystem is ERC721{
         uint256 tokenId;
     }
 
-    struct SalesObject{
+    //Object structure for ticket trading and selling
+    struct SalesObject{ 
         uint256 tokenIdforsale;
         uint256 price;
         bool swap;
@@ -74,8 +74,8 @@ contract TicketBookingSystem is ERC721{
         bool traded;
     }
 
-    mapping(uint256 => address payable) owners; //token id til adresse dictionary
-    mapping(uint256 => uint256) tokenIdforsale_Price;
+    mapping(uint256 => address payable) owners; //map owners of bought tickets. Could use ownerOf instead
+    mapping(uint256 => uint256) tokenIdforsale_Price; //Maps price of seat for sale
 
     constructor(
         string memory _show_title, 
@@ -88,7 +88,7 @@ contract TicketBookingSystem is ERC721{
         address deployer
     ) ERC721("ShowTicket", "ST") {
         show_title = _show_title;
-        seatPrice = _price; //all prices in ether for exlusive shows
+        seatPrice = _price;
         seatRow = _seat_row;
         seatPerRow = _seats_per_row;
         owner = deployer;
@@ -108,36 +108,35 @@ contract TicketBookingSystem is ERC721{
         uint256 interest
     );
     
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner may perform this action");
+        _;
+    }
+    
+    //Creates ticket
     function mintST(address recipient) internal returns(uint256){
         uint256 newItemId = ticketId;
         _safeMint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
         ticketId +=1;
-        // Buy function, calls minting of ticket, set ticketOwner variable, emit event to notify
         return newItemId;
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only the owner may perform this action");
-        _;
     }
 
     function setSeatPrice(uint _seatPrice) public onlyOwner {
         seatPrice = _seatPrice;
     }
 
-
     //Put ticket up to sale
     function sellTicket(uint256 _selltokenId, uint256 _price, bool _swap, uint256 _seatRowAim, uint256 _setNumberAim) public{
-        //Check is token is valid, by checking if it exists, owner and timestamp
+        //Check if token is valid
         require(verify(_selltokenId, msg.sender), "Something went wrong with the selling process.");
-        require(!checkTicketForSale(_selltokenId), "This ticket is already on sale.");
+        require(!checkTicketForSale(_selltokenId), "This ticket is already for sale.");
         SalesObject memory o =  SalesObject(_selltokenId, _price, _swap, _seatRowAim, _setNumberAim, false);
-        tokenIdforsale_Price[_selltokenId]=_price * 1000000000000000000; //all prices in ether
+        tokenIdforsale_Price[_selltokenId]=_price;
         for_sale.push(o);
         approve(address(this), _selltokenId);
     }
 
-    function checkTicketForSale(uint256 _tokenID) public view returns(bool) {
+    function checkTicketForSale(uint256 _tokenID) internal view returns(bool) {
         bool exist = false;
         for (uint i=0; i< for_sale.length; i++){
             //Check if ticket is for sale and not sold yet. 
@@ -149,7 +148,7 @@ contract TicketBookingSystem is ERC721{
         return exist;    
     }
     
-    //Check if the tokenID, given seatRow and seatNr matches a existing seat object and wants to trade (used in swap)
+    //Check if seller open for trading with your ticket (used in swap)
     function checkTicketForTrade(uint256 _buyertokenID, uint256 seatNrAim, uint256 seatRowAim) internal view returns(bool){
         for (uint i=0; i< taken_seats.length; i++){
             Seat memory Item = taken_seats[uint(i)];
@@ -160,11 +159,12 @@ contract TicketBookingSystem is ERC721{
         return false;
     }
 
-    //Buyer calls this function, if !_swaptokenID==0 trade otherwise buy
+    //Enables C and D to safely trade tickets. Price difference doesnt matter
     function tradeTicket(uint256 _sellertokenID, uint256 _buyertokenID) payable public {
-        //Swap tickets, price difference doesnt matter.
         address payable ticketowner = payable(ownerOf(_sellertokenID));
         require(checkTicketForSale(_sellertokenID), "The ticket you are asking for is not for sale.");        
+        
+        //Trade tickets when _buyertokenID != 0
         if (_buyertokenID != 0) {
             uint256 row;
             uint256 nr;
@@ -187,7 +187,7 @@ contract TicketBookingSystem is ERC721{
             owners[_buyertokenID] = payable(ownerOf(_buyertokenID));
         }
         
-        //Buy ticket
+        //Trade ticket for ether, when _buyertokenID == 0
         else{
             require(tokenIdforsale_Price[_sellertokenID] <= msg.sender.balance, "The balance is too low to buy this ticket.");
             require(ownerOf(_sellertokenID)!= msg.sender, "You cannot buy your own ticket.");
@@ -207,6 +207,7 @@ contract TicketBookingSystem is ERC721{
         }
     }
     
+    // Checks if seat is taken
     function seatAvailable(uint256 seatrow, uint256 seatnumber) internal view returns(bool){
         for (uint i=0; i< taken_seats.length; i++){
             if((taken_seats[uint(i)].row ==seatrow) && (taken_seats[uint(i)].number ==seatnumber)){
@@ -216,7 +217,7 @@ contract TicketBookingSystem is ERC721{
         return true;
     }
     
-    // buy a specific seat. Function call costs
+    // buy a specific seat if available
     function buy(uint256 seatrow, uint256 seatnumber) payable public returns(uint256){
         require(cancel == false, "The show is cancelled. You cannot buy a ticket for it.");
         require(seatrow<=seatRow && seatnumber<=seatPerRow && seatrow*seatnumber>0, "Seat does not exist");
@@ -228,16 +229,19 @@ contract TicketBookingSystem is ERC721{
         // Mint Ticket
         uint256 tokenId = mintST(buyer);
         //Create seat to be occupied
-        require(_exists(tokenId), "Token has not been minted");
+        require(_exists(tokenId), "Token has not been minted"); //Redundant check, guaranteed in _safeMint
         owners[tokenId] = payable(buyer);
         Seat memory seat = Seat(show_title, date, seatPrice, seatnumber, seatrow, "www.seatplan.com/showtitle", true, tokenId);
         taken_seats.push(seat);
+        
+        //transfers ether
         payable(owner).transfer(seatPrice);
         emit Buy(buyer, seatPrice);
          
         return tokenId;
     }
     
+    //Check validity of tokenId and address
     function verify(uint256 tokenId, address tokenOwner) public view returns (bool) {
         // Check if token exists and therefore is minted, but not spent.
         require(_exists(tokenId), "Token has not been minted or is burned"); 
@@ -246,8 +250,8 @@ contract TicketBookingSystem is ERC721{
         return true;
     }
     
-    // Refund tickets from show host if a show gets cancelled
-    function refund() public payable onlyOwner { //assumes show has money because it is a kjent theater
+    // Refund tickets from show if a show gets cancelled
+    function refund() public payable onlyOwner { 
         for (uint i=0; i< taken_seats.length; i++){
             uint256 tokenId = taken_seats[uint(i)].tokenId;
             if(ownerOf(tokenId) == owners[tokenId]){ //correct owner address and not address 0
@@ -255,12 +259,13 @@ contract TicketBookingSystem is ERC721{
                 _burn(tokenId);
             }
         }
-        cancel = true;        
+        cancel = true; //no more tickets may be sold       
     }
 
+    //Use ticket and mint poster
     function validate(uint256 tokenId, address tokenOwner) public onlyOwner{
-        require(verify(tokenId, tokenOwner), "Something went wrong.");
-        uint256 OneDayBefore = date - 86400;
+        require(verify(tokenId, tokenOwner), "Ticket is not valid");
+        uint256 OneDayBefore = date - 86400; // only available one day before show
         require(block.timestamp > OneDayBefore, "Too early to validate");
         _burn(tokenId);
         releasePoster(tokenOwner);
@@ -271,6 +276,7 @@ contract TicketBookingSystem is ERC721{
     }
 }
 
+//Proof of attendance
 contract Poster is ERC721 {
     uint256 posterId;
     //mapping posterId - show
@@ -284,7 +290,7 @@ contract Poster is ERC721 {
     function mintPoster(address recipient, string memory show_title) external returns(uint256) {
         uint256 newItemId = posterId;
         _safeMint(recipient, newItemId); // ERC721: Internal method to mint, emit and transfer minted token
-        MapPosterIdShow[newItemId] = show_title; //vurdere å teste om posterID finnes.
+        MapPosterIdShow[newItemId] = show_title; 
         posterId += 1;
         return newItemId;
         }
