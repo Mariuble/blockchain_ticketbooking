@@ -130,6 +130,8 @@ contract TicketBookingSystem is ERC721{
         //Check if token is valid
         require(verify(_selltokenId, msg.sender), "Something went wrong with the selling process.");
         require(!checkTicketForSale(_selltokenId), "This ticket is already for sale.");
+        require(_seatRowAim<=seatRow && _setNumberAim<=seatPerRow && _seatRowAim*_setNumberAim>0, "Seat does not exist");
+
         SalesObject memory o =  SalesObject(_selltokenId, _price, _swap, _seatRowAim, _setNumberAim, false);
         tokenIdforsale_Price[_selltokenId]=_price;
         for_sale.push(o);
