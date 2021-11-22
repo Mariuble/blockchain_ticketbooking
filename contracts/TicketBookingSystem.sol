@@ -249,19 +249,19 @@ contract TicketBookingSystem is ERC721{
         return true;
     }
     
-    // Refund tickets from show host if a show gets cancelled
-    function refund() public payable onlyOwner { //assumes show has money because it is a kjent theater
-        for (uint i=0; i< available_seats.length; i++){
-            if (available_seats[uint(i)].occupied){
-                uint256 tokenId = available_seats[uint(i)].tokenId;
-                if(ownerOf(tokenId) == owners[tokenId]){ //correct owner address
-                    owners[tokenId].transfer(available_seats[uint(i)].price); //transfer seatprice from owner to ticketowner
-                    _burn(tokenId);
-                }
+ // Refund tickets from show if a show gets cancelled
+    function refund() public payable onlyOwner { 
+        for (uint i=0; i< taken_seats.length; i++){
+            uint256 tokenId = taken_seats[uint(i)].tokenId;
+            if(ownerOf(tokenId) == owners[tokenId]){ //correct owner address and not address 0
+            //transfer the seatprice that the owner bought the ticket for from owner to ticketowner
+                owners[tokenId].transfer(taken_seats[uint(i)].price); 
+                _burn(tokenId);
             }
         }
-        cancel = true;        
+        cancel = true; //no more tickets may be sold       
     }
+
 
     function validate(uint256 tokenId, address tokenOwner) public onlyOwner{
         require(verify(tokenId, tokenOwner), "Something went wrong.");
