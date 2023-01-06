@@ -1,7 +1,8 @@
 # Ticket Booking System
 A blockchain based program to order tickets to a show.
   
-### Description  
+### Description
+This repository contains the codebase our project in the course TTM4195 - Blockchain Technologies and Cryptocurrencies
 
 
 ### Restrictions
